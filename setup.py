@@ -7,5 +7,11 @@ setup(
                 'or sequences.',
     url='https://github.com/bram98/fourierfun.git',
     author='Bram Verreussel',
+    license='MIT',
+    packages=['fourierfun'],
+    install_requires=['numpy',
+                      'matplotlib',
+                      ],
     
+    classifiers=[],
 )
