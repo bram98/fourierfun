@@ -1,2 +1,2 @@
 from fourierrange import FourierRange, FourierRange2d
-from fourierfun import fourierfun
+# from fourierfun import fourierfun
