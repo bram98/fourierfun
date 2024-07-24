@@ -41,6 +41,7 @@ def XY_c(nx, ny, Lx=None, Ly=None):
         
     return FourierRange2d(nx, ny, xmax=Lx, ymax=Ly).XY_c()
 
+
 class FourierRange2d:
     def __init__(self, nx, ny, xmax=None, ymax=None, k_in_radians=False):
         self.k_in_radians = k_in_radians
@@ -58,38 +59,51 @@ class FourierRange2d:
         
         xresult = FourierRange._get_xargs(xargs, frequency_unit=frequency_unit)
         yresult = FourierRange._get_xargs(yargs, frequency_unit=frequency_unit)
-        return FourierRange2d(xresult['n'], yresult['n'], xmax=xresult['xmax'], ymax=yresult['xmax'])
+        return FourierRange2d(xresult['n'], yresult['n'], 
+                              xmax=xresult['xmax'], ymax=yresult['xmax'], 
+                              k_in_radians=k_in_radians)
+        
     def from_ranges(rangex, rangey=None):
         if rangey is None:
             rangey = rangex
         return FourierRange2d(rangex.nx, rangey.nx, xmax=rangex.xmax, ymax=rangey.xmax)
+    
     @property
     def nx(self):
         return self.f_rangex.n
+    
     @property
     def ny(self):
         return self.f_rangey.n
+    
     @property
     def xmax(self):
         return self.f_rangex.xmax
+    
     @property
     def ymax(self):
         return self.f_rangey.xmax
+    
     @property
     def dx(self):
         return self.f_rangex.dx
+    
     @property
     def dy(self):
         return self.f_rangey.xmax
+    
     @property
     def dkx(self):
         return self.f_rangex.dk
+    
     @property
     def dky(self):
         return self.f_rangey.dk
+    
     @property
     def kxmax(self):
         return self.f_rangex.kmax
+    
     @property
     def kymax(self):
         return self.f_rangey.kmax
@@ -127,8 +141,8 @@ class FourierRange2d:
     def plot_extent(self):
         '''
         Helper function. Returns [0, xmax, 0, ymax - dx]. Is designed to be
-        used with the FourierRange.XY() method and can be fed directly into the 
-        extent argument of plt.imshow()
+        used together with the FourierRange.XY() method and can be fed directly
+        into the extent argument of plt.imshow()
         '''
         return [*self.f_rangex.plot_extent(), *self.f_rangey.plot_extent()]
     
@@ -186,6 +200,7 @@ class FourierRange:
         if FourierRange.warnings and not isclose(n, n_f):
             print('Warning: n provided was not an integer and is therefore rounded')
         return n
+    
     def _get_xargs(xargs: dict, frequency_unit=1.):
         if 'n' in xargs:
             n = FourierRange._round( xargs['n'] )
