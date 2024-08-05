@@ -176,11 +176,12 @@ class FourierRange2d:
         dy, ymax, ky, kymax
         '''
         return {
-            'n': self.n,
+            'nx': self.nx,
             'dx': self.dx,
             'xmax': self.xmax,
             'dkx': self.dkx,
             'kxmax': self.kxmax,
+            'ny': self.ny,
             'dy': self.dy,
             'ymax': self.ymax,
             'dky': self.dky,
