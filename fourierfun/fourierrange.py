@@ -90,7 +90,7 @@ class FourierRange2d:
     
     @property
     def dy(self):
-        return self.f_rangey.xmax
+        return self.f_rangey.dx
     
     @property
     def dkx(self):
