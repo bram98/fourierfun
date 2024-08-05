@@ -170,6 +170,23 @@ class FourierRange2d:
         '''
         return [*self.f_rangex.plot_extent_fft_c(), *self.f_rangey.plot_extent_fft_c()]
     
+    def to_dict(self):
+        '''
+        Returns a dictionary containing the keywords n, dx, xmax, kx, kxmax,
+        dy, ymax, ky, kymax
+        '''
+        return {
+            'n': self.n,
+            'dx': self.dx,
+            'xmax': self.xmax,
+            'dkx': self.dkx,
+            'kxmax': self.kxmax,
+            'dy': self.dy,
+            'ymax': self.ymax,
+            'dky': self.dky,
+            'kymax': self.kymax
+            }
+    
     def __repr__(self):
         return f'FourierRange2d({self.nx}, {self.ny}, xmax={self.xmax}, ymax={self.ymax}, k_in_radians={self.k_in_radians})'
 
@@ -338,6 +355,18 @@ class FourierRange:
         else:
             # odd
             return [ -self.kmax/2 + self.dk/2, self.kmax/2 - self.dk/2]
+    
+    def to_dict(self):
+        '''
+        Returns a dictionary containing the keywords n, dx, xmax, k, kmax.
+        '''
+        return {
+            'n': self.n,
+            'dx': self.dx,
+            'xmax': self.xmax,
+            'dk': self.dk,
+            'kmax': self.kmax,
+            }
     
     def __repr__(self):
         return f'FourierRange({self.n}, xmax={self.xmax}, k_in_radians={self.k_in_radians})'
