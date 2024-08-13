@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='fourierfun',
-    version='0.1.1',
+    version='0.1.2',
     description='A package for working with Fourier transforms of images and/' 
                 'or sequences.',
     url='https://github.com/bram98/fourierfun.git',
