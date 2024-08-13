@@ -9,25 +9,26 @@ Created on Tue Jun 18 12:02:19 2024
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 from colorsys import hsv_to_rgb
 from matplotlib.colors import ListedColormap
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-import sys
-import warnings
-if 'cv2' in sys.modules:
-    import cv2
-    CV2_IMPORTED = True
-else:
-    warnings.warn('cv2 not installed. Using fallback')
-    CV2_IMPORTED = False
+import oklab
+from dataclasses import dataclass
+from numpy.typing import ArrayLike
 
+__all__ = ['cimshow', 'complex_imshow', 'colorize', 'colorize_hsv', 
+           'colorize_oklab', 'CustomColorbar']
 
 #%%
-def colorize(z):
+def colorize_hsv(z):
+    '''
+    https://stackoverflow.com/a/20958684/3502079
+    '''
     r = np.abs(z)
     arg = np.angle(z) 
     
-    
+    oklab.oklch_to_rgb
     r = np.clip(r, 0, 1)
 
     h = (arg + np.pi)  / (2 * np.pi) + 0.5
@@ -41,10 +42,81 @@ def colorize(z):
     c = c.transpose(1,2,0) 
     return c
 
+def colorize_oklab(z):
+    r = np.abs(z)
+    arg = np.angle(z)
+    
+    r = np.clip(r, 0, 1)
+    
+    l = r*0.78
+    c = r*0.11
+    h = arg/(2*np.pi)
+    
+    img_lch = oklab.list_to_img([l, c, h])
+    img_rgb = oklab.oklch_to_rgb(img_lch, clip=True)
+    
+    return img_rgb
 
+colorize = colorize_oklab
+
+def z_to_cmap(z, display_function, scalar_output, cmap):
+    colors = display_function( [ z ] )[0]
+    
+    # convert array to colormaps
+    if scalar_output:
+        return colormaps[cmap]
+    else:
+        return ListedColormap(colors)
+
+def make_colorbar(cmap, ax_img, ax_divider, padding, vmin=0, vmax=1, 
+                  ticks=None, ticklabels=None, label=''):
+    # # define array of colors to show in colorbar
+    # abs_colors = display_function( [ np.linspace( 0, 1, 200 ) ] )[0]
+    
+    # # convert array to colormaps
+    # if scalar_output:
+    #     abs_cmap = colormaps[cmap]
+    # else:
+    #     abs_cmap = ListedColormap(abs_colors)
+    
+    cbar_ax = ax_divider.append_axes('right', size='5%', pad=padding)
+    padding = "15%"
+    
+    
+    normalize = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=False)
+    
+    cbar = ax_img.figure.colorbar(
+                    matplotlib.cm.ScalarMappable(norm=normalize, cmap=cmap),
+                    cax=cbar_ax,
+                    label='')
+    cbar_ax.set_title(label)
+    if not ticks is None:
+        cbar.set_ticks(ticks)
+    if not ticklabels is None:
+        cbar.set_ticklabels(ticklabels)
+
+@dataclass
+class CustomColorbar:
+    z: ArrayLike
+    label: str = ''
+    ticks: ArrayLike = None
+    ticklabels: ArrayLike = None
+    vmin: float = None
+    vmax: float = None
+    
+
+re_cbar = CustomColorbar(
+    z=np.linspace(0, 1, num=200),
+    label='re'
+    )
+im_cbar = CustomColorbar(
+    z=np.linspace(0, 1j, num=200),
+    label='im'
+    )
 
 def complex_imshow(img: np.array, ax=None, plt=None, display_function=colorize,
-                   norm=None, abs_colorbar=True, phase_colorbar=True, 
+                   norm=None, abs_colorbar=False, phase_colorbar=False, 
+                   cmap='viridis', vmin=None, vmax=None, custom_cbars=[],
                    **imshow_args
                    ):
     if ax is None:
@@ -54,177 +126,140 @@ def complex_imshow(img: np.array, ax=None, plt=None, display_function=colorize,
             fig, ax = plt.subplots()
 
     # `normalize` is function that maps [vmin, vmax] to [0, 1]
-    vmin, vmax = np.min(np.abs(img)), np.max(np.abs(img))
+    if vmin is None or vmax is None:
+        abs_img = np.abs(img)
+        
+        if vmin is None:
+            vmin = np.min(abs_img)
+            
+        if vmax is None:
+            vmax = np.max(abs_img)
     normalize = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=False)
 
     # display image using `display_function`
     img_data = display_function(normalize(img))
-    ax_img = ax.imshow(img_data)
+    scalar_output = len(img_data.shape) == 2
+    ax_img = ax.imshow(img_data, cmap=cmap)
 
-    if abs_colorbar or phase_colorbar:
-        # perform some magic so colorbar have same height as image
-        ax_divider = make_axes_locatable(ax)
+    
 
     # we want 6% padding for first colorbar and 15% for second
     padding = "6%"
-
+    
+    cbars = []
+    
     if abs_colorbar:
-        # define array of colors to show in colorbar
-        abs_colors = display_function( [ np.linspace( 0, 1, 200 ) ] )[0]
-        
-        # convert array to colormaps
-        abs_cmap = ListedColormap(abs_colors)
-        
-        abs_colorbar_ax = ax_divider.append_axes('right', size='5%', pad=padding)
-        padding = "15%"
-        
-        ax_img.figure.colorbar(
-                        matplotlib.cm.ScalarMappable(norm=normalize, cmap=abs_cmap),
-                        cax=abs_colorbar_ax,
-                        label=''
-                        )
-         
+        abs_cbar = CustomColorbar(
+                z=np.linspace( 0, 1, 200 ),
+                label='abs',
+                vmin=None,
+                vmax=None
+            )
+        cbars.append(abs_cbar)
+    
     if phase_colorbar:
-        phase_colors = display_function( [ np.exp(1j*np.linspace( 0, 2*np.pi, 200 )) ] )[0]
-        phase_cmap = ListedColormap(phase_colors)
-        phase_colorbar_ax = ax_divider.append_axes('right', size='5%', pad=padding)
-        normalize_phase = matplotlib.colors.Normalize(vmin=0, vmax=2*np.pi, clip=False)
-        cbar = ax_img.figure.colorbar(
-                        matplotlib.cm.ScalarMappable(
-                                            norm=normalize_phase, 
-                                            cmap=phase_cmap
-                                            ),
-                        cax=phase_colorbar_ax,
-                        label=''
-                        )
+        phase_cbar = CustomColorbar(
+                z=np.exp(1j*np.linspace( 0, 2*np.pi, 200 )),
+                label='arg',
+                ticks=np.arange(4 + 1)*np.pi/2,
+                ticklabels=['$0$', r'$\pi/2$', r'$\pi$',
+                            r'$3\pi/2$', r'$2\pi$'],
+                vmin=0,
+                vmax=2*np.pi
+            )
         
-        # for phase use fancy ticks that show multiples of pi
-        cbar.set_ticks(np.arange(4 + 1)*np.pi/2)
-        cbar.set_ticklabels(['$0$', r'$\pi/2$', r'$\pi$', r'$3\pi/2$', r'$2\pi$'])
+        cbars.append(phase_cbar)
+        
+    cbars += custom_cbars
+    
+    if len(cbars) > 0:
+        # perform some magic so colorbars have same height as image
+        ax_divider = make_axes_locatable(ax)
+    
+    print(len(cbars))
+    
+    padding = "6%"
+    for cbar in cbars:
+        
+    
+        custom_cmap = z_to_cmap(cbar.z, display_function, scalar_output, cmap)
+        
+        if scalar_output and cbar.vmin is None and cbar.vmax is None:
+            cbar.vmin = np.min(display_function(img))
+            cbar.vmax = np.max(display_function(img))
+            print(cbar.vmin, cbar.vmax)
+
+        make_colorbar(cmap=custom_cmap, ax_img=ax_img, ax_divider=ax_divider, 
+                      padding=padding, vmin=cbar.vmin, vmax=cbar.vmax,
+                      ticks=cbar.ticks, ticklabels=cbar.ticklabels, 
+                      label=cbar.label)
+        padding = "15%"
+    # make_colorbar(cmap, ax_img, ax_divider, padding, vmin=0, vmax=1, 
+    #                   ticks=None, ticklabels=None, label=''):
+    if not plt is None:
+        plt.sca(ax)
 
 
 # shorthand for complex_imshow:
 cimshow = complex_imshow
 
-#%%
 
-X, Y = np.meshgrid(np.arange(100) - 50, np.arange(100) - 50)
-img = X + 1j*Y
 
-# simplest use case
-plt.title('simple use case')
-cimshow(img, plt=plt)
-plt.show()
-# If you do plt.title after cimshow, the title shows above the colorbars
-
-# use axes instead of plt, low dpi to show difference
-fig, ax = plt.subplots(dpi=25)
-cimshow(-img, ax=ax)
-ax.set_title('use ax instead of plt')
-plt.show()
-
-# turn off colorbars independently
-fig, ax = plt.subplots(dpi=300)
-plt.title('no colorbars')
-cimshow(img, ax=ax, abs_colorbar=False, phase_colorbar=False)
-plt.show()
-
-# show off (weird) custom display function
-def colorize2(z):
-    # must be normalized!
-    z /= np.max(np.abs(z) ) + .00001
-    
-    
-    real = np.real(z)
-    result = np.array( [np.clip(real, 0, 1), np.abs(z)*np.abs(np.imag(z)), np.clip( - real, 0, 1)] )
-    result = np.transpose(result, axes=(1, 2, 0))
-    return result
-
-fig, ax = plt.subplots(dpi=300)
-plt.title('custom display function')
-cimshow(img, ax=ax, display_function=colorize2)
-plt.show()
 
 #%%
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-import hsluv
-import numexpr
-def colorize_cv(z):
-    # x = np.arange(256, dtype='float')
-    # y = np.arange(256, dtype='float')
-    # X, Y = np.meshgrid(x, y)
-    # zero = X*0
-    # one = zero + 1
-    # # rgb = np.array([X, Y, zero])
-    # # rgb = rgb.transpose((1, 2, 0))
-    # # bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    # # lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2Lab)
-    # # lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2Lab)
-    r = np.abs(z)
-    x = np.real(z)
-    y = np.imag(z)
-    h = np.angle(z)
-    h = h % ( 2*np.pi )
-    h_deg = h*180/np.pi
+if __name__ == '__main__':
+    # simplest use case
+    X, Y = np.meshgrid(np.arange(100) - 50, np.arange(100) - 50)
+    img = X + 1j*Y
     
-    s = np.ones(h.shape)*100
-    l = r*60
-    hsl = np.array([h_deg,s,l])
-    c = np.apply_along_axis(hsluv.hsluv_to_rgb, 0, hsl)# --> tuple
-    c = np.array(c)  # -->  array of (3,n,m) shape, but need (n,m,3)
-    c = c.transpose(1,2,0) 
-    return c
-    L = r - 1
-    a = x
-    b = y
-    norm = np.sqrt(L**2 + a**2 + b**2)
-    L = L*128/norm + 128
-    a = a*128/norm + 128
-    b = b*128/norm + 128
-    # L = X
-    # a = (np.cos(Y/256*2*np.pi))*128*X/256 + 128
-    # b = (np.sin(Y/256*2*np.pi))*128*X/256 + 128
-    img = np.array([L, a, b]).astype('uint8')
-    img = img.transpose((1, 2, 0))
-    bgr = cv2.cvtColor(img, cv2.COLOR_LAB2BGR)
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    cv2.imshow('image', bgr)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    return rgb, lab
+    cimshow(img, plt=plt)
+    plt.title('simple use case')
+    plt.show()
+    # If you do plt.title after cimshow, the title shows above the colorbars
+    
+    # use axes instead of plt for more complicated figures
+    fig, axes = plt.subplots(ncols=2)
+    cimshow(img, ax=axes[0])
+    axes[0].set_title('use ax instead of plt')
+    cimshow(img, ax=axes[1], display_function=np.abs, abs_colorbar=True)
+    axes[1].set_title('use ax instead of plt')
+    plt.tight_layout()
+    plt.show()
+    
+    # Default colorbars
+    fig, ax = plt.subplots()
+    plt.title('default colorbars')
+    cimshow(img, ax=ax, abs_colorbar=True, phase_colorbar=True)
+    plt.tight_layout()
+    plt.show()
+    
+    # show off (weird) custom display function
+    def colorize2(z):
+        # must be normalized!
+        z /= np.max(np.abs(z) ) + .00001
+        
+        
+        real = np.real(z)
+        result = np.array( [np.clip(real, 0, 1), np.abs(z)*np.abs(np.imag(z)), np.clip( - real, 0, 1)] )
+        result = np.transpose(result, axes=(1, 2, 0))
+        return result
+    
+    fig, ax = plt.subplots(dpi=300)
+    plt.title('custom display function')
+    cimshow(img, ax=ax, display_function=colorize2)
+    plt.show()
+    
+    # Custom colorbar
+    fig, axes = plt.subplots(ncols=2)
+    cimshow(img, ax=axes[0], display_function=np.real, custom_cbars=[re_cbar])
+    axes[0].set_title('Custom colorbar')
+    
+    im_cbar = CustomColorbar(
+        z = np.linspace(0, 1j, num=200),
+        label = 'im'
+        )
+    cimshow(img, ax=axes[1], display_function=np.imag, custom_cbars=[im_cbar])
+    axes[1].set_title('')
+    plt.tight_layout()
+    plt.show()
 
-n = 100
-x = np.linspace(-1, 1, num=n, dtype='float')
-y = np.linspace(-1, 1, num=n, dtype='float')
-X, Y = np.meshgrid(x, y)
-Z = X + 1j*Y
-Z[np.where(np.abs(Z)>1.)] = 1.
-c = colorize_cv(Z)
-plt.imshow(c)
-# plt.imshow(rgb)
-# plt.show()
-# plt.imshow(lab[:,:,0])
-# plt.colorbar()
-# plt.show()
-# plt.imshow(lab[:,:,1])
-# plt.colorbar()
-# plt.show()
-# plt.imshow(lab[:,:,2])
-# plt.colorbar()
-# plt.show()
-# %%
-h = np.arange(10)
-s = np.arange(10)
-l = np.arange(10)
-import numexpr as ne
-
-ne.evaluate('hsluv.hsluv_to_rgb([h, s, l])')
-# %%
-from numba import njit
-import numba
-hsluv_jit = numba.jit(nopython=True)(hsluv.hsluv_to_rgb)
-# %%
-hsluv_jit([h, s, l])
-# %%

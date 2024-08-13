@@ -4,6 +4,10 @@ https://bottosson.github.io/posts/oklab/
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
+
+__all__ = ['matmul', 'list_to_img', 'img_to_list', 'float_to_u8', 
+           'u8_to_float', 'linrgb_to_rgb', 'rgb_to_linrgb', 'rgb_to_oklab',
+           'oklab_to_rgb', 'oklab_to_oklch', 'oklch_to_oklab', 'oklch_to_rgb']
 # %%
 M1 = np.array([[0.4122214708, 0.5363325363, 0.0514459929],
                [0.2119034982, 0.6806995451, 0.1073969566],
@@ -23,12 +27,13 @@ M1inv = np.array([[+4.0767416621, -3.3077115913, +0.2309699292],
 
 def matmul(M, v):
     '''
-    multiplies 3x3 matrix by N-D list of vectors of shape (:, :, ... , 3)
+    multiplies NxN matrix by array of vectors of shape (:, :, ... , N)
     '''
     v_ = np.expand_dims(v, axis=-1)
     return np.matmul(M, v_).squeeze(-1) 
 
 def list_to_img(col_list):
+    col_list = np.array(col_list)
     axes = np.arange(len(col_list.shape))
     return np.transpose(np.array(col_list), (*axes[1:], 0))
 
@@ -36,12 +41,13 @@ def img_to_list(img):
     axes = np.arange(len(img.shape))
     return np.transpose(np.array(img), (-1, *axes[:-1]))
 
-def float_to_u8(f):
-    f = np.clip(f, 0, 1)
+def float_to_u8(f, clip=False):
+    if clip:
+        f = np.clip(f, 0, 1)
     return np.round(f*255).astype(np.uint8)
 
 def u8_to_float(f):
-    return f.astype(float)*255
+    return f.astype(float)/255.
 
 def linrgb_to_rgb(rgb, clip=False):
     small_values = rgb < 0.0031308
@@ -112,52 +118,3 @@ def oklch_to_rgb(lch, clip=False):
     return oklab_to_rgb(oklch_to_oklab(lch), clip=clip)
 
 
-#%%
-rgb = np.array([114, 138, 0])
-print(rgb_to_oklab(rgb/255., clip=False))
-
-#%%
-x = np.linspace(-1, 1, num=1000)
-y = np.linspace(-1, 1, num=1000)
-X, Y = np.meshgrid(x, y)
-R = np.sqrt(X**2 + Y**2)
-theta = np.arctan2(Y, X)/(2*np.pi)
-cmin = 0.0
-cmax = 0.25
-
-R *= R < 0.9
-
-L = R
-# C = cmin + (cmax - cmin)*R**2
-C = X*0 + 0.1147
-h = theta
-
-# L = X*.684
-# C = X*0 + 0.1147
-# C = cmin + (cmax - cmin)*X 
-# h = Y
-LCh = np.array([L, C, h])
-LCh = LCh.transpose((1, 2, 0))
-# plt.imshow(LCh)
-# plt.show()
-fig, ax = plt.subplots(dpi=300)
-plt.imshow(oklab_to_rgb(oklch_to_oklab(LCh), clip=False))
-# plt.imshow(oklch_to_oklaboklab_to_rgb(LCh, clip=True))
-#%%
-def gamma(x):
-    result = np.zeros(len(x))
-    result = ( 1.055*x**1/2.4 - .055 )*(x >= 0.0031308) + \
-                ( 12.92*x )*(x < 0.0031308)
-    return result
-    
-xx = np.linspace(0, 1)
-
-plt.plot(xx, gamma(xx))
-# %%
-print(float_to_u8(oklch_to_rgb(np.array([.72, 0.1, 300/360]))))
-# %%
-%%timeit
-oklch_to_rgb(LCh)
-
-
-# %%
