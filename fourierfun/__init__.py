@@ -1,4 +1,4 @@
-from .fourierrange import FourierRange, FourierRange2d
+from . fourierrange import FourierRange, FourierRange2d
 
-import cplot
-import testimgs
+from . import cplot
+from . import testimgs
